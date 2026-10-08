@@ -1,0 +1,50 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require 'json'
+require 'optparse'
+require_relative '../lib/whoami_os'
+
+options = { recipient: WhoAmIOS::RECIPIENT, purpose: 'personal-context', limit: 8 }
+parser = OptionParser.new do |o|
+  o.banner = '用法: bin/whoami 操作 --memory /path/to/personal-memory [选项]'
+  o.on('--memory PATH', '用户选择的个人目录') { |v| options[:memory] = v }
+  o.on('--domain NAME', '召回领域，如 career') { |v| options[:domain] = v }
+  o.on('--purpose NAME', '本次用途') { |v| options[:purpose] = v }
+  o.on('--recipient NAME', '接收宿主，V1 为 codex-local') { |v| options[:recipient] = v }
+  o.on('--task-id ID', '当前任务 ID') { |v| options[:task_id] = v }
+  o.on('--limit N', Integer, '召回条数上限') { |v| options[:limit] = v }
+  o.on('--approval-hash HASH', '用户确认过的完整预览摘要') { |v| options[:approval_hash] = v }
+  o.on('--id ID', '证据记录 ID') { |v| options[:id] = v }
+end
+
+begin
+  command = ARGV.shift
+  parser.parse!(ARGV)
+  raise WhoAmIOS::Error, parser.to_s unless options[:memory]
+  store = WhoAmIOS::Store.new(options[:memory])
+  result = case command
+           when 'init' then store.init!
+           when 'status' then store.status
+           when 'grants' then store.grants
+           when 'open' then store.open_context(recipient: options[:recipient], purpose: options[:purpose], task_id: options[:task_id])
+           when 'prepare'
+             input = JSON.parse($stdin.read)
+             store.prepare(input.fetch('changes'), selected_ids: input['selected_change_ids'])
+           when 'apply'
+             raise WhoAmIOS::Error, 'apply 需要 --approval-hash' unless options[:approval_hash]
+             store.apply!(JSON.parse($stdin.read), approval_hash: options[:approval_hash])
+           when 'recall'
+             raise WhoAmIOS::Error, 'recall 需要 --domain 和 --task-id' unless options[:domain] && options[:task_id]
+             store.recall(domain: options[:domain], recipient: options[:recipient], purpose: options[:purpose], task_id: options[:task_id], limit: options[:limit])
+           when 'evidence'
+             raise WhoAmIOS::Error, 'evidence 需要 --id 和 --task-id' unless options[:id] && options[:task_id]
+             store.evidence(id: options[:id], recipient: options[:recipient], purpose: options[:purpose], task_id: options[:task_id])
+           when 'recover' then store.recover!
+           else raise WhoAmIOS::Error, parser.to_s
+           end
+  puts JSON.pretty_generate(result)
+rescue WhoAmIOS::Error, JSON::ParserError, KeyError => e
+  warn JSON.generate({ 'error' => e.class.name, 'message' => e.message })
+  exit 2
+end
