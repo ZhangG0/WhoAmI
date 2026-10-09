@@ -102,7 +102,7 @@ Recall 先读取清单和授权元数据，再校验拟使用摘要的来源内�
 
 ### 3. 首次使用与现有记录
 
-「本机第一次调用 Skill」不等于「没有个人模型」。当尚未确定记忆目录时，提供**新建个人模型**和**打开现有记录**两个入口。macOS 默认个人目录为 `~/Library/Application Support/WhoAmI/personal-memory`，用户可指定其他目录；两者都与通用 OS 仓库分开。迁移电脑后，用户可重新选择带来的记录目录。
+「本机第一次调用 Skill」不等于「没有个人模型」。当尚未确定记忆目录时，提供**新建个人模型**和**打开现有记录**两个入口。macOS 默认个人目录为 `~/Library/Application Support/WhoAmI/personal-memory`，Windows 为 `%LOCALAPPDATA%\WhoAmI\personal-memory`，用户可指定其他目录；两者都与通用 OS 仓库分开。迁移电脑后，用户可重新选择带来的记录目录。
 
 读取选定目录后，再判断状态：
 
@@ -220,7 +220,7 @@ AI 负责理解与提出候选；本地模块负责能确定检查的操作。�
 
 ### 个人目录
 
-真实资料默认保存在 macOS 的 `~/Library/Application Support/WhoAmI/personal-memory`，也可由用户指定其他独立目录；通用 OS 仓库只放规则、代码、模板和虚构示例。以下是可形成的目录，不要求首次创建全部空文件。
+真实资料默认保存在 macOS 的 `~/Library/Application Support/WhoAmI/personal-memory` 或 Windows 的 `%LOCALAPPDATA%\WhoAmI\personal-memory`，也可由用户指定其他独立目录；通用 OS 仓库只放规则、代码、模板和虚构示例。以下是可形成的目录，不要求首次创建全部空文件。
 
 ```text
 personal-memory/

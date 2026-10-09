@@ -23,9 +23,18 @@ module WhoAmIOS
   MAX_RECALL_BYTES = 64 * 1024
   MAX_CONTEXT_BYTES = 8 * 1024
 
-  def self.default_memory_path(home: Dir.home, platform: RUBY_PLATFORM, xdg_data_home: ENV['XDG_DATA_HOME'])
+  def self.default_memory_path(home: Dir.home, platform: RUBY_PLATFORM, xdg_data_home: ENV['XDG_DATA_HOME'],
+                               local_app_data: ENV['LOCALAPPDATA'])
     if platform.include?('darwin')
       File.join(home, 'Library', 'Application Support', 'WhoAmI', 'personal-memory')
+    elsif platform.match?(/mswin|mingw|cygwin/i)
+      data_home = if local_app_data.is_a?(String) &&
+                     (local_app_data.match?(/\A[A-Za-z]:[\\\/]/) || local_app_data.start_with?('\\\\'))
+                    local_app_data
+                  else
+                    File.join(home, 'AppData', 'Local')
+                  end
+      File.join(data_home.tr('\\', '/'), 'WhoAmI', 'personal-memory')
     else
       data_home = xdg_data_home&.start_with?('/') ? xdg_data_home : File.join(home, '.local', 'share')
       File.join(data_home, 'whoami', 'personal-memory')
@@ -554,15 +563,19 @@ module WhoAmIOS
       end
       FileUtils.mkdir_p(File.dirname(path), mode: 0o700)
       tmp = "#{path}.tmp-#{SecureRandom.hex(6)}"
-      File.open(tmp, File::WRONLY | File::CREAT | File::EXCL, 0o600) { |f| f.write(bytes); f.flush; f.fsync }
+      File.open(tmp, 'wbx', 0o600) { |f| f.write(bytes); f.flush; f.fsync }
       File.rename(tmp, path)
-      File.open(File.dirname(path), 'r') { |dir| dir.fsync }
+      File.open(File.dirname(path), 'r') { |dir| dir.fsync } unless windows?
     ensure
       File.delete(tmp) if tmp && File.exist?(tmp)
     end
 
     def sync_file(path)
       File.open(path, 'r') { |f| f.fsync }
+    end
+
+    def windows?
+      RUBY_PLATFORM.match?(/mswin|mingw|cygwin/i)
     end
 
     def read_file(relative)

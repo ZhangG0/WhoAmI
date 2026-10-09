@@ -9,7 +9,7 @@ WhoAmI OS 是产品；本 Skill 是 Codex 内的第一个交互入口。完整�
 
 ## 首次进入
 
-先运行 `bin/whoami location` 告知默认位置（macOS 为 `~/Library/Application Support/WhoAmI/personal-memory`）。用户未指定其他目录时使用默认位置；选择其他目录时，对每次命令传入相同的 `--memory <目录>`。新建时运行 `init`，已有目录先运行 `status`。目录异常时停下并说明，不能初始化覆盖，也不能因查询而创建空目录。
+先运行 `bin/whoami location` 告知当前系统的默认位置（macOS 为 `~/Library/Application Support/WhoAmI/personal-memory`，Windows 为 `%LOCALAPPDATA%\WhoAmI\personal-memory`）。Windows 上用 `ruby .\bin\whoami` 调用命令。用户未指定其他目录时使用默认位置；选择其他目录时，对每次命令传入相同的 `--memory <目录>`。新建时运行 `init`，已有目录先运行 `status`。目录异常时停下并说明，不能初始化覆盖，也不能因查询而创建空目录。
 
 访谈每轮问一两个相关问题。先了解当前角色、目标、重要约束与协作偏好；用户可跳过。把用户原话与自己的解释分开。一次表达不升级为稳定人格结论。
 

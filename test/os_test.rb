@@ -264,5 +264,17 @@ class WhoAmIOSTest < Minitest::Test
                  WhoAmIOS.default_memory_path(home: @temp, platform: 'darwin')
     assert_equal File.join(@temp, 'data', 'whoami', 'personal-memory'),
                  WhoAmIOS.default_memory_path(home: @temp, platform: 'linux', xdg_data_home: File.join(@temp, 'data'))
+    assert_equal 'C:/Users/A Name/AppData/Local/WhoAmI/personal-memory',
+                 WhoAmIOS.default_memory_path(home: 'C:/Users/A Name', platform: 'x64-mingw32',
+                                              local_app_data: 'C:\\Users\\A Name\\AppData\\Local')
+    assert_equal 'C:/Users/A Name/AppData/Local/WhoAmI/personal-memory',
+                 WhoAmIOS.default_memory_path(home: 'C:/Users/A Name', platform: 'x64-mingw32',
+                                              local_app_data: 'relative-path')
+  end
+
+  def test_windows_directory_sync_branch_keeps_process_recovery
+    @os.define_singleton_method(:windows?) { true }
+    commit([event, record])
+    assert_equal 2, @os.status['record_count']
   end
 end
