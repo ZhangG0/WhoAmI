@@ -48,15 +48,16 @@ WhoAmI OS 是一个由用户掌控的个人上下文系统，让不同 AI 在获
 
 架构中的 **Core 层是通用规范**；运行时的 **core memory 是 Memory 中轻量、可重建的个人摘要**，两者不要混同。依赖方向是 Skills 遵循 Core，通过本地读写模块访问 Memory；Adapters 调用同样的操作契约。读写模块是 Memory 的执行组件，不新增一层，不承担访谈和人格推断。平台接口变化不应改写人物模型含义。
 
-当前发行结构如下。**四层是逻辑职责，`skills/who-am-i/` 是首个可迁移安装单位**；把 OS 的本地运行模块放入 Skill 包，不表示 OS 只是一份提示词：
+当前发行结构如下。**四层是逻辑职责，`.agents/skills/who-am-i/` 是首个可安装单位**；把 OS 的本地运行模块放入 Skill 包，不表示 OS 只是一份提示词：
 
 ```text
 WhoAmI/
 ├── design/                       # 产品设计与图解，不随 Skill 安装
-├── skills/who-am-i/               # 完整的 Codex 本地安装单位
-│   ├── SKILL.md                   # Skills / Codex 接入
-│   ├── scripts/                   # Memory 的本地读写执行模块与命令
-│   └── references/                # Core 文件约定与使用契约
+├── .agents/skills/               # Codex 在仓库内自动发现的 Skill 位置
+│   └── who-am-i/                  # 可单独安装的完整 Skill 包
+│       ├── SKILL.md               # Skills / Codex 接入
+│       ├── scripts/               # Memory 的本地读写执行模块与命令
+│       └── references/            # Core 文件约定与使用契约
 └── test/                         # 开发回归测试，不随 Skill 安装
 
 默认或用户指定的 personal-memory/   # OS 的个人数据，始终在安装包外

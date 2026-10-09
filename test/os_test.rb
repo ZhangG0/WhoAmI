@@ -4,7 +4,7 @@ require 'minitest/autorun'
 require 'tmpdir'
 require 'open3'
 require 'rbconfig'
-require_relative '../skills/who-am-i/scripts/whoami_os'
+require_relative '../.agents/skills/who-am-i/scripts/whoami_os'
 
 class WhoAmIOSTest < Minitest::Test
   def setup
@@ -235,7 +235,7 @@ class WhoAmIOSTest < Minitest::Test
 
   def test_default_location_is_outside_repository_and_requires_init
     env = { 'HOME' => @temp }
-    command = File.expand_path('../skills/who-am-i/scripts/whoami', __dir__)
+    command = File.expand_path('../.agents/skills/who-am-i/scripts/whoami', __dir__)
     expected = WhoAmIOS.default_memory_path(home: @temp)
     out, err, status = Open3.capture3(env, RbConfig.ruby, command, 'location')
     assert status.success?, err
@@ -251,7 +251,7 @@ class WhoAmIOSTest < Minitest::Test
 
   def test_explicit_memory_path_overrides_default
     env = { 'HOME' => @temp }
-    command = File.expand_path('../skills/who-am-i/scripts/whoami', __dir__)
+    command = File.expand_path('../.agents/skills/who-am-i/scripts/whoami', __dir__)
     chosen = File.join(@temp, 'other-personal-memory')
     out, err, status = Open3.capture3(env, RbConfig.ruby, command, 'init', '--memory', chosen)
     assert status.success?, err
@@ -281,7 +281,7 @@ class WhoAmIOSTest < Minitest::Test
   def test_skill_folder_runs_after_being_copied_alone
     installed = File.join(@temp, 'installed', 'who-am-i')
     FileUtils.mkdir_p(File.dirname(installed))
-    FileUtils.cp_r(File.expand_path('../skills/who-am-i', __dir__), installed)
+    FileUtils.cp_r(File.expand_path('../.agents/skills/who-am-i', __dir__), installed)
     command = File.join(installed, 'scripts', 'whoami')
     home = File.join(@temp, 'new-home')
     env = { 'HOME' => home }

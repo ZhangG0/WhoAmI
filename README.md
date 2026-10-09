@@ -3,7 +3,7 @@
 WhoAmI OS 用 YAML 保存经用户确认的个人信息，并按当前任务和授权提供给 AI。产品逻辑仍分为 Core（规则）、Memory（记录与读写）、Skills（访谈与更新）和 Adapters（宿主接入）；**当前可安装的发行单位是一个完整的 `who-am-i` Skill 文件夹**，其中包含第一版所需的运行模块。Skill 是 OS 的入口和打包方式，不等于全部产品设计。
 
 ```text
-skills/who-am-i/
+.agents/skills/who-am-i/
 ├── SKILL.md                 # Codex 交互入口
 ├── scripts/
 │   ├── whoami               # 本地命令
@@ -13,7 +13,17 @@ skills/who-am-i/
     └── schema.md            # 人物记录与授权约定
 ```
 
-复制整个 `skills/who-am-i/` 文件夹即可迁移这一版的 Codex Skill；**只复制 `SKILL.md` 不够**。运行需要本机 Ruby 2.6+，没有额外软件包依赖。首次使用可先运行 `scripts/whoami location` 查看个人数据目录，再执行 `init`。Windows PowerShell 使用 `ruby .\scripts\whoami location`。详细命令和虚构示例见 [使用契约](skills/who-am-i/references/usage.md)。
+## 安装与使用
+
+仓库内的 Codex 会从 `.agents/skills/` 自动发现这个 Skill。在其他电脑的 Codex 中可提出：
+
+```text
+用 $skill-installer 安装 https://github.com/ZhangG0/WhoAmI/tree/main/.agents/skills/who-am-i
+```
+
+安装器会取得**整个 Skill 包**并放入本机的 Skill 搜索目录，Codex 随后发现它；用户不必手工复制文件夹。这是独立 Skill 的本地安装方式，不是插件目录发布。运行仍需本机 Ruby 2.6+，没有额外软件包依赖。
+
+首次使用可在安装包内运行 `ruby scripts/whoami location` 查看个人数据目录，再执行 `init`。Windows PowerShell 使用 `ruby .\scripts\whoami location`。详细命令和虚构示例见 [使用契约](.agents/skills/who-am-i/references/usage.md)。
 
 真实个人资料始终在安装包外：macOS 默认是 `~/Library/Application Support/WhoAmI/personal-memory`，Windows 默认是 `%LOCALAPPDATA%\WhoAmI\personal-memory`，也可通过 `--memory` 指定其他目录。移动 Skill 文件夹不会移动个人资料；迁移到另一台电脑时，须由用户另行带上资料目录并重新指定路径。OS 不会自动扫描聊天、提交 Git 或同步远端。
 
@@ -22,5 +32,5 @@ skills/who-am-i/
 在仓库内运行回归测试：
 
 ```sh
-ruby -I skills/who-am-i/scripts test/os_test.rb
+ruby -I .agents/skills/who-am-i/scripts test/os_test.rb
 ```

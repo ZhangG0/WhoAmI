@@ -1,6 +1,6 @@
 # 本地操作契约
 
-需要 Ruby 2.6+。从本 Skill 文件夹调用 `scripts/whoami`；Windows 使用 `ruby scripts\whoami`。所有操作都可用 `--memory "自选目录"` 覆盖默认个人目录。`location` 只显示路径；`init` 才创建新目录，且不会覆盖已有内容。
+需要 Ruby 2.6+。从本 Skill 文件夹用 `ruby scripts/whoami` 调用；Windows PowerShell 用 `ruby .\scripts\whoami`。所有操作都可用 `--memory "自选目录"` 覆盖默认个人目录。`location` 只显示路径；`init` 才创建新目录，且不会覆盖已有内容。
 
 ```text
 location            显示本机默认或自选的个人目录
