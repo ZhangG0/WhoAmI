@@ -3,11 +3,11 @@
 
 require 'json'
 require 'optparse'
-require_relative '../lib/whoami_os'
+require_relative 'whoami_os'
 
 options = { recipient: WhoAmIOS::RECIPIENT, purpose: 'personal-context', limit: 8 }
 parser = OptionParser.new do |o|
-  o.banner = '用法: bin/whoami 操作 [--memory /path/to/personal-memory] [选项]'
+  o.banner = '用法: scripts/whoami 操作 [--memory /path/to/personal-memory] [选项]'
   o.on('--memory PATH', '覆盖默认个人目录') { |v| options[:memory] = v }
   o.on('--domain NAME', '召回领域，如 career') { |v| options[:domain] = v }
   o.on('--purpose NAME', '本次用途') { |v| options[:purpose] = v }

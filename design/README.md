@@ -48,17 +48,18 @@ WhoAmI OS 是一个由用户掌控的个人上下文系统，让不同 AI 在获
 
 架构中的 **Core 层是通用规范**；运行时的 **core memory 是 Memory 中轻量、可重建的个人摘要**，两者不要混同。依赖方向是 Skills 遵循 Core，通过本地读写模块访问 Memory；Adapters 调用同样的操作契约。读写模块是 Memory 的执行组件，不新增一层，不承担访谈和人格推断。平台接口变化不应改写人物模型含义。
 
-当前 OS 仓库结构如下；运行时代码已落地，访谈与多宿主能力仍会迭代：
+当前发行结构如下。**四层是逻辑职责，`skills/who-am-i/` 是首个可迁移安装单位**；把 OS 的本地运行模块放入 Skill 包，不表示 OS 只是一份提示词：
 
 ```text
 WhoAmI/
-├── design/                       # 本组设计文档
-├── core/                         # schema、证据/时间/更新/隐私规则
-├── lib/                          # 本地读写、权限校验、事务恢复
-├── skills/who-am-i/               # SKILL.md、三个工作流、模板与虚构示例
-└── adapters/                     # V1 的首个本地宿主接入；后续扩展 MCP/API
+├── design/                       # 产品设计与图解，不随 Skill 安装
+├── skills/who-am-i/               # 完整的 Codex 本地安装单位
+│   ├── SKILL.md                   # Skills / Codex 接入
+│   ├── scripts/                   # Memory 的本地读写执行模块与命令
+│   └── references/                # Core 文件约定与使用契约
+└── test/                         # 开发回归测试，不随 Skill 安装
 
-用户指定的 personal-memory/        # OS 的个人数据，不在通用代码仓库中
+默认或用户指定的 personal-memory/   # OS 的个人数据，始终在安装包外
 ```
 
 V1 采用指令、文件、模板和轻量本地读写模块，**不做数据库、向量库、Web UI、后台监听或自动跨平台同步**。本目录 HTML 是设计图示，不是产品 Web UI。Git 用于版本追踪，由用户管理提交和远端；Skill 不自动提交、推送个人数据。
