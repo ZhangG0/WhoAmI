@@ -23,17 +23,27 @@ module WhoAmIOS
   MAX_RECALL_BYTES = 64 * 1024
   MAX_CONTEXT_BYTES = 8 * 1024
 
+  def self.default_memory_path(home: Dir.home, platform: RUBY_PLATFORM, xdg_data_home: ENV['XDG_DATA_HOME'])
+    if platform.include?('darwin')
+      File.join(home, 'Library', 'Application Support', 'WhoAmI', 'personal-memory')
+    else
+      data_home = xdg_data_home&.start_with?('/') ? xdg_data_home : File.join(home, '.local', 'share')
+      File.join(data_home, 'whoami', 'personal-memory')
+    end
+  end
+
   class Store
     attr_reader :root
 
-    def initialize(root)
+    def initialize(root = WhoAmIOS.default_memory_path)
       @root = File.expand_path(root)
     end
 
     def init!
       raise Conflict, '目录已有内容，不能初始化覆盖' if File.exist?(@root) && !Dir.empty?(@root)
       FileUtils.mkdir_p(@root, mode: 0o700)
-      lock do
+      lock(creating: true) do
+        raise Conflict, '目录已初始化，不能覆盖' if File.file?(safe_path('manifest.yaml'))
         policy_bytes = yaml_dump({ 'grants' => [] })
         write_atomic('manifest.yaml', yaml_dump({ 'schema_version' => 1, 'model_id' => SecureRandom.uuid,
                                                     'revision' => 0, 'entries' => {}, 'summary' => nil,
@@ -49,7 +59,7 @@ module WhoAmIOS
         recover_locked!
         m = manifest
         policy
-        { 'model_id' => m.fetch('model_id'), 'revision' => m.fetch('revision'),
+        { 'memory_path' => @root, 'model_id' => m.fetch('model_id'), 'revision' => m.fetch('revision'),
           'record_count' => m.fetch('entries').size }
       end
     end
@@ -571,8 +581,8 @@ module WhoAmIOS
       YAML.dump(data)
     end
 
-    def lock
-      FileUtils.mkdir_p(@root, mode: 0o700)
+    def lock(creating: false)
+      raise Error, '记忆目录尚未初始化，请先运行 init' unless creating || File.file?(safe_path('manifest.yaml'))
       File.open(safe_path('.lock'), File::RDWR | File::CREAT, 0o600) do |f|
         f.flock(File::LOCK_EX)
         yield

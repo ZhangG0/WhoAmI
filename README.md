@@ -1,6 +1,6 @@
 # WhoAmI OS · 本地最小版
 
-WhoAmI OS 将用户确认的个人信息保存在**用户自己选择的目录**，并按当前任务和授权提供给 AI。它包含人物模型规则（`core/`）、本地记忆模块（`lib/`）、交互工作流（`skills/`）和首个 Codex 接入（`adapters/`）。Skill 是入口，不是整个产品。
+WhoAmI OS 将用户确认的个人信息默认保存在**本机独立目录**，用户也可以自己选择其他目录，并按当前任务和授权提供给 AI。它包含人物模型规则（`core/`）、本地记忆模块（`lib/`）、交互工作流（`skills/`）和首个 Codex 接入（`adapters/`）。Skill 是入口，不是整个产品。
 
 这个版本以 **YAML 作为唯一的结构化数据源**：事件、人物判断、清单和授权各有自己的 YAML 文件。`AGENT.md` 是从获准长期记录生成的可读摘要，可以重建，不能反向覆盖 YAML。真实个人资料必须放在通用代码仓库外。
 
@@ -9,21 +9,22 @@ WhoAmI OS 将用户确认的个人信息保存在**用户自己选择的目录**
 需要 macOS 或其他带 Ruby 2.6+ 标准库的环境；没有外部软件包依赖。
 
 ```sh
-bin/whoami init --memory /path/to/my-private-memory
-bin/whoami status --memory /path/to/my-private-memory
-bin/whoami open --memory /path/to/my-private-memory
-bin/whoami recall --memory /path/to/my-private-memory --domain career --purpose personal-context --task-id current-task
+bin/whoami location
+bin/whoami init
+bin/whoami status
+bin/whoami open
+bin/whoami recall --domain career --purpose personal-context --task-id current-task
 ```
 
-`init` 只接受不存在或空目录，绝不覆盖现有记忆。`open` 返回经权限和版本检查的摘要；`recall` 返回获准的相关记录与来源 ID，`evidence --id ... --task-id ...` 在获准时展开来源。普通任务不必召回领域记录。
+macOS 默认目录是 `~/Library/Application Support/WhoAmI/personal-memory`（实际路径可用 `bin/whoami location` 查看）。所有命令都可以用 `--memory /自选目录` 覆盖默认位置；已有资料不会自动搬迁。`location` 不会创建文件，`init` 只接受不存在或空目录，绝不覆盖现有记忆。`open` 返回经权限和版本检查的摘要；`recall` 返回获准的相关记录与来源 ID，`evidence --id ... --task-id ...` 在获准时展开来源。普通任务不必召回领域记录。
 
-`grants --memory <目录>` 列出当前授权。需要收回某项许可时，把 `{ "changes": [{ "change_id": "chg-revoke", "op": "revoke_grant", "target_id": "grant-..." }] }` 交给 `prepare`，预览并确认后再 `apply`。撤销授权会立即使相关摘要失效，但不会删除原记录；删除内容请用 `forget`。
+`grants` 列出当前授权。需要收回某项许可时，把 `{ "changes": [{ "change_id": "chg-revoke", "op": "revoke_grant", "target_id": "grant-..." }] }` 交给 `prepare`，预览并确认后再 `apply`。撤销授权会立即使相关摘要失效，但不会删除原记录；删除内容请用 `forget`。
 
 写入分两步。把候选 JSON 送给 `prepare`；把返回的逐项 `preview` 给用户看。用户确认**当前**预览后，才将原样 proposal 送给 `apply`，并传入其 `patch_hash`。若只确认一部分，用 `selected_change_ids` 重新 `prepare` 和展示。改动或版本变化会使旧预览失效。
 
 ```sh
-bin/whoami prepare --memory /path/to/my-private-memory < candidate.json > proposal.json
-bin/whoami apply --memory /path/to/my-private-memory --approval-hash <当前预览的patch_hash> < proposal.json
+bin/whoami prepare < candidate.json > proposal.json
+bin/whoami apply --approval-hash PATCH_HASH < proposal.json
 ```
 
 候选格式（以下全是虚构资料，`confirmation_id` 必须来自实际确认流程）：

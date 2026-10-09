@@ -2,6 +2,8 @@
 
 require 'minitest/autorun'
 require 'tmpdir'
+require 'open3'
+require 'rbconfig'
 require_relative '../lib/whoami_os'
 
 class WhoAmIOSTest < Minitest::Test
@@ -229,5 +231,38 @@ class WhoAmIOSTest < Minitest::Test
     assert_nil @os.open_context['summary']
     refute @os.recall(domain: 'career', purpose: 'personal-context', task_id: 'advice')['records'].any? { |r| r['id'] == 'rec-preference-001' }
     assert_equal 2, @os.status['record_count']
+  end
+
+  def test_default_location_is_outside_repository_and_requires_init
+    env = { 'HOME' => @temp }
+    command = File.expand_path('../bin/whoami', __dir__)
+    expected = WhoAmIOS.default_memory_path(home: @temp)
+    out, err, status = Open3.capture3(env, RbConfig.ruby, command, 'location')
+    assert status.success?, err
+    assert_equal expected, JSON.parse(out)['memory_path']
+    _out, _err, status = Open3.capture3(env, RbConfig.ruby, command, 'status')
+    refute status.success?
+    refute File.exist?(expected)
+    out, err, status = Open3.capture3(env, RbConfig.ruby, command, 'init')
+    assert status.success?, err
+    assert_equal expected, JSON.parse(out)['memory_path']
+    assert File.file?(File.join(expected, 'manifest.yaml'))
+  end
+
+  def test_explicit_memory_path_overrides_default
+    env = { 'HOME' => @temp }
+    command = File.expand_path('../bin/whoami', __dir__)
+    chosen = File.join(@temp, 'other-personal-memory')
+    out, err, status = Open3.capture3(env, RbConfig.ruby, command, 'init', '--memory', chosen)
+    assert status.success?, err
+    assert_equal chosen, JSON.parse(out)['memory_path']
+    refute File.exist?(WhoAmIOS.default_memory_path(home: @temp))
+  end
+
+  def test_default_path_follows_local_platform_convention
+    assert_equal File.join(@temp, 'Library', 'Application Support', 'WhoAmI', 'personal-memory'),
+                 WhoAmIOS.default_memory_path(home: @temp, platform: 'darwin')
+    assert_equal File.join(@temp, 'data', 'whoami', 'personal-memory'),
+                 WhoAmIOS.default_memory_path(home: @temp, platform: 'linux', xdg_data_home: File.join(@temp, 'data'))
   end
 end
