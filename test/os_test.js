@@ -35,6 +35,170 @@ const load = file => YAML.parse(fs.readFileSync(file, 'utf8'));
 const recall = store => store.recall({ domain: 'career', purpose: 'personal-context', taskId: 'advice' });
 const evidence = (store, id) => store.evidence({ id, purpose: 'personal-context', taskId: 'advice' });
 
+const observationPermission = () => ({ change_id: 'chg-permission', op: 'authorize_observation', grant: {
+  id: 'grant-observation', actions: ['persist', 'recall', 'send'], purpose: 'personal-context', recipient: 'codex-local',
+  task_id: '*', until_revoked: true, confirmation_id: 'fictional-standing-consent',
+  scope: { dimensions: ['goals', 'patterns', 'synthesis'], kinds: ['state', 'interpretation', 'pattern'],
+    sensitivities: ['ordinary', 'personal'], source_types: ['self_report', 'observation'], domains: ['career'] }
+} });
+const observationContext = () => ({ grant_id: 'grant-observation', purpose: 'personal-context', recipient: 'codex-local', task_id: 'advice' });
+const observationChanges = () => {
+  const source = event(); delete source.grants;
+  source.record.source = { type: 'observation', reference: 'fictional-conversation:turn-1' };
+  source.record.statement = '在本次讨论中，比较完两个方案后继续询问更多选项';
+  const inference = record(); delete inference.grants;
+  Object.assign(inference.record, { kind: 'interpretation', dimension: 'synthesis', statement: '面对不确定选择时可能倾向继续收集信息' });
+  return [source, inference];
+};
+
+test('standing permission is explicit; authorized observation preserves independent axes', t => {
+  const { store } = fixture(t);
+  const permission = store.prepare([observationPermission()]);
+  assert.throws(() => store.apply(permission), PermissionDenied);
+  assert.equal(store.grants().length, 0);
+  store.apply(permission, permission.patch_hash);
+  const proposal = store.prepare(observationChanges(), null, observationContext());
+  const result = store.apply(proposal);
+  assert.equal(result.authorization_mode, 'standing');
+  assert.deepEqual(store.apply(proposal), result);
+  const item = recall(store).records[0];
+  assert.equal(item.storage_authorization.mode, 'standing');
+  assert.equal(item.storage_authorization.parent_grant_id, 'grant-observation');
+  assert.equal(item.user_alignment, 'unreviewed');
+  assert.equal(item.kind, 'interpretation');
+  assert.equal(item.evidence_level, 'E0');
+  assert.equal(item.confidence, null);
+  assert.equal(store.openContext().summary, null);
+});
+
+test('automatic save rejects missing permission, privilege expansion and out of scope data', t => {
+  const { store } = fixture(t);
+  assert.throws(() => store.prepare(observationChanges(), null, observationContext()), PermissionDenied);
+  commit(store, [observationPermission()]);
+  for (const mutate of [
+    changes => { changes[1].record.sensitivity = 'sensitive'; },
+    changes => { changes[1].record.domains = ['finance']; },
+    changes => { changes[1].record.dimension = 'values'; },
+    changes => { changes[1].record.include_in_summary = true; changes[1].record.stability = 'long_term'; },
+    changes => { changes[1].grants = [grant(['persist', 'summary'])]; },
+    changes => { changes[0].record.source.type = 'ai_output'; },
+    changes => { changes.push({ change_id: 'chg-revoke', op: 'revoke_grant', target_id: 'grant-observation' }); }
+  ]) {
+    const changes = observationChanges(); mutate(changes);
+    assert.throws(() => store.prepare(changes, null, observationContext()), PermissionDenied);
+  }
+  for (const override of [{ recipient: 'other-model' }, { purpose: 'advertising' }]) {
+    assert.throws(() => store.prepare(observationChanges(), null, { ...observationContext(), ...override }), PermissionDenied);
+  }
+  assert.equal(store.status().record_count, 0);
+});
+
+test('standing scopes cannot include sensitive domains or summary rights', t => {
+  const { store } = fixture(t);
+  for (const mutate of [g => g.actions.push('summary'), g => g.scope.domains.push('finance'),
+    g => g.scope.sensitivities.push('sensitive'), g => g.scope.dimensions.push('relationships')]) {
+    const permission = observationPermission(); mutate(permission.grant);
+    assert.throws(() => store.prepare([permission]), WhoAmIError);
+  }
+});
+
+test('revocation stops future saves and derived recall; stale previews cannot apply', t => {
+  const { store } = fixture(t); commit(store, [observationPermission()]);
+  store.apply(store.prepare(observationChanges(), null, observationContext()));
+  const next = observationChanges(); next[0].record.id = 'evt-next'; next[1].record.id = 'rec-next'; next[1].record.evidence_ids = ['evt-next'];
+  const stale = store.prepare(next, null, observationContext());
+  commit(store, [{ change_id: 'chg-revoke', op: 'revoke_grant', target_id: 'grant-observation' }]);
+  assert.throws(() => store.apply(stale), Conflict);
+  assert.throws(() => store.prepare(next, null, observationContext()), PermissionDenied);
+  assert.deepEqual(recall(store).records, []);
+  assert.equal(store.status().record_count, 2);
+});
+
+test('expired or task limited standing permission cannot authorize saves', t => {
+  const { store } = fixture(t); const permission = observationPermission();
+  permission.grant.expires_at = '2000-01-01';
+  commit(store, [permission]);
+  assert.throws(() => store.prepare(observationChanges(), null, observationContext()), PermissionDenied);
+  const limited = observationPermission(); limited.grant.id = 'grant-limited'; limited.grant.task_id = 'other-task';
+  commit(store, [limited]);
+  assert.throws(() => store.prepare(observationChanges(), null, { ...observationContext(), grant_id: 'grant-limited' }), PermissionDenied);
+});
+
+test('sensitive existing evidence cannot be laundered into automatic observations', t => {
+  const { store } = fixture(t); const source = event(); source.record.sensitivity = 'sensitive';
+  commit(store, [source, observationPermission()]);
+  assert.throws(() => store.prepare([observationChanges()[1]], null, observationContext()), PermissionDenied);
+});
+
+test('user disagreement and later agreement preserve inference, evidence and feedback history', t => {
+  const { store, memory } = fixture(t); commit(store, [observationPermission()]);
+  store.apply(store.prepare(observationChanges(), null, observationContext()));
+  for (const stance of ['disagree', 'agree']) {
+    const source = event(`evt-feedback-${stance}`); source.record.statement = stance === 'disagree' ? '我认为这是谨慎，不是犹豫' : '这个情境下确实如此';
+    commit(store, [source, { change_id: 'chg-feedback', op: 'record_feedback', target_id: 'rec-work-001', event_id: source.record.id, stance }]);
+    const context = recall(store); const item = context.records[0];
+    assert.equal(item.user_alignment, stance);
+    assert.equal(item.kind, 'interpretation'); assert.equal(item.evidence_level, 'E0'); assert.equal(item.confidence, null);
+    assert.equal(item.storage_authorization.mode, 'standing');
+    assert.deepEqual(item.evidence_ids, ['evt-work-001']);
+    if (stance === 'disagree') assert.ok(context.uncertainties.some(u => u.reason === 'user_disagree'));
+  }
+  assert.deepEqual(recall(store).records[0].feedback_history.map(f => f.stance), ['disagree', 'agree']);
+  assert.equal(load(path.join(memory, 'model/synthesis/rec-work-001.yaml')).statement, observationChanges()[1].record.statement);
+});
+
+test('feedback must come from user and cannot bypass source permissions or deletion', t => {
+  const { store } = fixture(t); commit(store, [event(), record()]);
+  const ai = event('evt-ai'); ai.record.source = { type: 'ai_output' };
+  const feedback = { change_id: 'chg-feedback', op: 'record_feedback', target_id: 'rec-work-001', event_id: 'evt-ai', stance: 'agree' };
+  assert.throws(() => store.prepare([ai, feedback]), WhoAmIError);
+  const source = event('evt-feedback', 'never'); feedback.event_id = source.record.id; feedback.stance = 'disagree';
+  commit(store, [source, feedback]);
+  assert.deepEqual(recall(store).records, []);
+  const proposal = store.prepare([{ change_id: 'chg-forget', op: 'forget', target_id: source.record.id }]);
+  assert.ok(proposal.preview[0].removed_ids.includes('rec-work-001'));
+  store.apply(proposal, proposal.patch_hash);
+  assert.equal(store.status().record_count, 1);
+});
+
+test('observation cannot masquerade as self report and saved axes cannot be forged', t => {
+  const { store } = fixture(t);
+  const changes = observationChanges(); changes.forEach(c => { c.grants = [grant(['persist'])]; });
+  changes[1].record.kind = 'fact';
+  assert.throws(() => store.prepare(changes), /观察不能伪装/);
+  for (const key of ['storage_authorization', 'user_alignment', 'feedback_history']) {
+    const item = record(); item.record[key] = 'confirmed';
+    assert.throws(() => store.prepare([event(), item]), /专用操作/);
+  }
+});
+
+test('CLI completes consent and authorized writes without per-record approval hash', t => {
+  const { memory, store } = fixture(t); const { run } = require('../skill/scripts/whoami');
+  const cli = (command, input, ...options) => run([command, '--memory', memory, ...options], () => JSON.stringify(input));
+  const permission = cli('prepare', { changes: [observationPermission()] });
+  assert.throws(() => cli('apply', permission), /approval-hash/);
+  cli('apply', permission, '--approval-hash', permission.patch_hash);
+  const proposal = cli('prepare', { changes: observationChanges(), authorization: observationContext() });
+  const tampered = structuredClone(proposal); tampered.changes[1].record.statement = '无依据的改写';
+  assert.throws(() => cli('apply', tampered), /预览摘要/);
+  assert.equal(store.status().record_count, 0);
+  assert.equal(cli('apply', proposal).authorization_mode, 'standing');
+  assert.equal(store.status().record_count, 2);
+});
+
+test('v1 stores remain readable and upgrade transactionally on first new write', t => {
+  const { memory, store } = fixture(t); const file = path.join(memory, 'manifest.yaml');
+  const legacy = load(file); legacy.schema_version = 1; fs.writeFileSync(file, YAML.stringify(legacy));
+  assert.equal(store.status().record_count, 0);
+  assert.equal(load(file).schema_version, 1);
+  const permission = store.prepare([observationPermission()]);
+  assert.throws(() => store.apply(permission, permission.patch_hash, 0), WhoAmIError);
+  new Store(memory).recover();
+  assert.equal(load(file).schema_version, 1);
+  store.apply(permission, permission.patch_hash);
+  assert.equal(load(file).schema_version, 2);
+});
+
  test('cold start persists YAML and new session recalls with source', t => {
   const { memory, store } = fixture(t); commit(store, [event(), record(), ...stablePreference()]);
   const reopened = new Store(memory); assert.equal(reopened.status().record_count, 4);

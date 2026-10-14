@@ -27,11 +27,12 @@ function run(argv = process.argv.slice(2), stdin = () => fs.readFileSync(0, 'utf
     case 'open': return store.openContext(options);
     case 'prepare': {
       const input = JSON.parse(stdin());
-      return store.prepare(input.changes, input.selected_change_ids);
+      return store.prepare(input.changes, input.selected_change_ids, input.authorization);
     }
     case 'apply': {
-      if (!options.approvalHash) throw new WhoAmIError('apply 需要 --approval-hash');
-      return store.apply(JSON.parse(stdin()), options.approvalHash);
+      const proposal = JSON.parse(stdin());
+      if (!options.approvalHash && !proposal.authorization) throw new WhoAmIError('apply 需要 --approval-hash 或有效持续授权');
+      return store.apply(proposal, options.approvalHash);
     }
     case 'recall': {
       if (!options.domain || !options.taskId) throw new WhoAmIError('recall 需要 --domain 和 --task-id');
